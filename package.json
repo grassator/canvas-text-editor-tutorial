@@ -1,0 +1,21 @@
+{
+  "author": "Dmitriy Kubyshkin <dmitriy@kubyshkin.ru>",
+  "name": "canvas-text-editor",
+  "description": "Simple text editor using html5 canvas",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">= 0.4.x < 0.7.0"
+  },
+  "scripts": {
+    "test": "make test"
+  },
+  "devDependencies": {
+    "coffee-script": "latest",
+    "stitch": "latest",
+    "uglify-js": "latest",
+    "express": "latest",
+    "mocha": "latest",
+    "should": "latest",
+    "sinon": "latest"
+  }
+}
