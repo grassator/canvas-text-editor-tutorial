@@ -6,9 +6,5 @@ build:
 serve:
 	node ./scripts/serve.js
 
-# Runs Mocha test suite
-test:
-	@./node_modules/.bin/mocha -r should -r sinon
-
 # These aren't real targets so we need to list them here
-.PHONY: test build serve
+.PHONY: build serve
