@@ -9,8 +9,10 @@
   <script type="text/javascript" src="http://localhost:4000/lib.js"></script>
   <script type="text/javascript" charset="utf-8">
     document.addEventListener('DOMContentLoaded', function(){
-      var CanvasTextEditor = require('CanvasTextEditor');
-      var editor = new CanvasTextEditor;
+      var CanvasTextEditor = require('CanvasTextEditor'),
+          Document = require('Document'),
+          doc = new Document('Line1\nLine that is little bit longer\nLine4'),
+          editor = new CanvasTextEditor(doc);
       document.body.appendChild(editor.getEl());
     }, false);
   </script>
