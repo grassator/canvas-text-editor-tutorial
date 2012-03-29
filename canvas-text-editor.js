@@ -52,7 +52,7 @@
 
 var FontMetrics = require('FontMetrics'),
     Document = require('Document'),
-    Cursor = require('Cursor');
+    Selection = require('Selection');
 
 /**
  * Simple plain-text text editor using html5 canvas.
@@ -64,7 +64,7 @@ var CanvasTextEditor = function(doc) {
   this._createWrapper();
   this._createCanvas();
   this._createInput();
-  this._cursor = new Cursor(this);
+  this._selection = new Selection(this);
 };
 
 module.exports = CanvasTextEditor;
@@ -100,23 +100,33 @@ CanvasTextEditor.prototype._createCanvas = function() {
   this.canvas.style.display = 'block';
   this.context = this.canvas.getContext('2d');
   this.resize(640, 480);
+  this.render();
+  this.wrapper.appendChild(this.canvas);
+};
 
-  // For now just very dumb implementation of rendering
+/**
+ * Renders document onto the canvas
+ * @return {[type]} [description]
+ */
+CanvasTextEditor.prototype.render = function() {
   var baselineOffset = this._metrics.getBaseline(),
       lineHeight = this._metrics.getHeight(),
       characterWidth = this._metrics.getWidth(),
       maxHeight = Math.ceil(640 / lineHeight),
       lineCount = this._document.getLineCount();
 
+  // Making sure we don't render somethign that we won't see
   if (lineCount < maxHeight) maxHeight = lineCount;
 
+  // Clearing previous iteration
+  this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+  // Looping over document lines
   for(var i = 0; i < maxHeight; ++i) {
     this.context.fillText(
       this._document.getLine(i), 0, lineHeight * i + baselineOffset
     );
   }
-
-  this.wrapper.appendChild(this.canvas);
 };
 
 /**
@@ -126,9 +136,10 @@ CanvasTextEditor.prototype._createCanvas = function() {
 CanvasTextEditor.prototype._createInput = function() {
   this.inputEl = document.createElement('textarea');
   this.inputEl.style.position = 'absolute';
-  this.inputEl.style.top = '-100px';
+  this.inputEl.style.top = '-10px';
   this.inputEl.style.height = 0;
   this.inputEl.style.width = 0;
+  this.inputEl.addEventListener('input', this.handleInput.bind(this), false);
   this.inputEl.addEventListener('blur', this.blur.bind(this), false);
   this.inputEl.addEventListener('focus', this._inputFocus.bind(this), false);
   this.inputEl.addEventListener('keydown', this.keydown.bind(this), false);
@@ -137,12 +148,49 @@ CanvasTextEditor.prototype._createInput = function() {
 };
 
 /**
+ * Handles regular text input into our proxy field
+ * @param  {Event} e
+ */
+CanvasTextEditor.prototype.handleInput = function(e) {
+  this.insertTextAtCurrentPosition(e.target.value);
+  e.target.value = '';
+};
+
+/**
+ * Inserts text at the current cursor position
+ * @param  {string} text
+ */
+CanvasTextEditor.prototype.insertTextAtCurrentPosition = function(text) {
+  var pos = this._selection.getPosition();
+  // Inserting new text and changing position of cursor to a new one
+  this._selection.setPosition.apply(
+    this._selection,
+    this._document.insertText(text, pos[0], pos[1])
+  );
+  this.render();
+};
+
+/**
+ * Deletes text at the current cursor position
+ * @param  {string} text
+ */
+CanvasTextEditor.prototype.deleteCharAtCurrentPosition = function(forward) {
+  var pos = this._selection.getPosition();
+  // Deleting text and changing position of cursor to a new one
+  this._selection.setPosition.apply(
+    this._selection,
+    this._document.deleteChar(forward, pos[0], pos[1])
+  );
+  this.render();
+};
+
+/**
  * Real handler code for editor gaining focus.
  * @private
  */
 CanvasTextEditor.prototype._inputFocus = function() {
   this.wrapper.style.outline = '1px solid #09f';
-  this._cursor.setVisible(true);
+  this._selection.setVisible(true);
 };
 
 /**
@@ -187,22 +235,33 @@ CanvasTextEditor.prototype.resize = function(width, height) {
 CanvasTextEditor.prototype.keydown = function(e) {
   var handled = true;
   switch(e.keyCode) {
+    case 8: // backspace
+      this.deleteCharAtCurrentPosition(false);
+      break;
+    case 46: // delete
+      this.deleteCharAtCurrentPosition(true);
+      break;
+    case 13: // Enter
+      this.insertTextAtCurrentPosition('\n');
+      break;
     case 37: // Left arrow
-      this._cursor.moveLeft();
+      this._selection.moveLeft();
       break;
     case 38: // Up arrow
-      this._cursor.moveUp();
+      this._selection.moveUp();
       break;
     case 39: // Up arrow
-      this._cursor.moveRight();
+      this._selection.moveRight();
       break;
     case 40: // Down arrow
-      this._cursor.moveDown();
+      this._selection.moveDown();
       break;
     default:
       handled = false;
   }
-  return !handled;
+  if(handled) {
+    e.preventDefault();
+  }
 };
 
 /**
@@ -211,7 +270,7 @@ CanvasTextEditor.prototype.keydown = function(e) {
 CanvasTextEditor.prototype.blur = function() {
   this.inputEl.blur();
   this.wrapper.style.outline = 'none';
-  this._cursor.setVisible(false);
+  this._selection.setVisible(false);
 };
 
 /**
@@ -221,149 +280,6 @@ CanvasTextEditor.prototype.focus = function() {
   this.inputEl.focus();
 };
 
-}, "Cursor": function(exports, require, module) {/**
- * Creates new cursor for the editor.
- * @param {Editor} editor.
- * @constructor
- */
-Selection = function(editor) {
-  this.editor = editor;
-  this.blinkInterval = 500;
-
-  this.start = {
-    line: 0,
-    character: 0
-  };
-
-  this.end = {
-    line: 0,
-    character: 0
-  };
-
-  this.el = document.createElement('div');
-  this.el.style.position = 'absolute';
-  this.el.style.width = '1px';
-  this.el.style.height = this.editor.getFontMetrics().getHeight() + 'px';
-  this.el.style.backgroundColor = '#000';
-
-  this.editor.getEl().appendChild(this.el);
-  this.setPosition(0, 0);
-};
-
-/**
- * Responsible for cursor blinking
- * @return {void}
- */
-Selection.prototype.blink = function() {
-  if (parseInt(this.el.style.opacity, 10)) {
-    this.el.style.opacity = 0;
-  } else {
-    this.el.style.opacity = 1;
-  }
-};
-
-/**
- * Moves cursor to a specified position inside document.
- * @param {number} position Offset from the start of the document.
- */
-Selection.prototype.setPosition = function(line, character) {
-  // Providing defaults for both line and character parts of position
-  if (typeof line === 'undefined') line = this.end.line
-  if (typeof character === 'undefined') character = this.end.character
-
-  // Checking lower bounds
-  line >= 0 || (line = 0);
-  character >= 0 || (character = 0);
-
-  // Checking upper bounds
-  var lineCount = this.editor.getDocument().getLineCount();
-  line < lineCount || (line = lineCount - 1);
-  var characterCount = this.editor.getDocument().getLine(line).trim('\n').length;
-  character <= characterCount || (character = characterCount);
-
-  // Saving new value
-  this.start.line = this.end.line = line;
-  this.start.character = this.end.character = character;
-
-  // Calculating new position on the screen
-  var metrics = this.editor.getFontMetrics(),
-      offsetX = character * metrics.getWidth(),
-      offsetY = line * metrics.getHeight();
-  this.el.style.left = offsetX + 'px';
-  this.el.style.top = offsetY + 'px';
-
-  // This helps to see moving cursor when it is always in blink on
-  // state on a new position. Try to move cursror in any editor and you
-  // will see this in action.
-  if(this.isVisible()) {
-    this.el.style.opacity = 1;
-    clearInterval(this.interval);
-    this.interval = setInterval(this.blink.bind(this), this.blinkInterval);
-  }
-};
-
-/**
- * Moves cursor up specified amount of lines.
- * @param  {number} length
- */
-Selection.prototype.moveUp = function(length) {
-  arguments.length || (length = 1);
-  var line = this.end.line - length;
-  this.setPosition(line);
-};
-
-/**
- * Moves cursor down specified amount of lines.
- * @param  {number} length
- */
-Selection.prototype.moveDown = function(length) {
-  arguments.length || (length = 1);
-  this.setPosition(this.end.line + length);
-};
-
-/**
- * Moves cursor up specified amount of lines.
- * @param  {number} length
- */
-Selection.prototype.moveLeft = function(length) {
-  arguments.length || (length = 1);
-  this.setPosition(undefined, this.end.character - length);
-};
-
-/**
- * Moves cursor down specified amount of lines.
- * @param  {number} length
- */
-Selection.prototype.moveRight = function(length) {
-  arguments.length || (length = 1);
-  this.setPosition(undefined, this.end.character + length);
-};
-
-/**
- * Shows or hides cursor.
- * @param {void} visible Whether cursor should be visible
- */
-Selection.prototype.setVisible = function(visible) {
-  clearInterval(this.interval);
-  if(visible) {
-    this.el.style.display = 'block';
-    this.el.style.opacity = 1;
-    this.interval = setInterval(this.blink.bind(this), this.blinkInterval);
-  } else {
-    this.el.style.display = 'none';
-  }
-  this.visible = visible;
-};
-
-/**
- * Returns visibility of the cursor.
- * @return {Boolean}
- */
-Selection.prototype.isVisible = function() {
-  return this.visible;
-};
-
-module.exports = Selection;
 }, "Document": function(exports, require, module) {
 /**
  * Creates new document from provided text.
@@ -435,6 +351,109 @@ Document.prototype.getLength = function() {
 Document.prototype.charAt = function(column, row) {
   var row = this.storage[row];
   if (row) return row.charAt(column);
+};
+
+/**
+ * Inserts text into arbitrary position in the document
+ * @param  {string} text
+ * @param  {number} column
+ * @param  {number} row
+ * @return {Array} new position in the document
+ */
+Document.prototype.insertText = function(text, column, row) {
+  // First we need to split inserting text into array lines
+  text = Document.prepareText(text);
+
+  // First we calculate new column position because
+  // text array will be changed in the process
+  var newColumn = text[text.length - 1].length;
+  if (text.length === 1) newColumn += column;
+
+  // append remainder of the current line to last line in new text
+  text[text.length - 1] += this.storage[row].substr(column);
+
+  // append first line of the new text to current line up to "column" position
+  this.storage[row] = this.storage[row].substr(0, column) + text[0];
+
+  // now we are ready to splice other new lines
+  // (not first and not last) into our storage
+  var args = [row + 1, 0].concat(text.slice(1));
+  this.storage.splice.apply(this.storage, args);
+
+  // Finally we calculate new position
+  column = newColumn;
+  row += text.length - 1;
+
+  return [column, row];
+};
+
+/**
+ * Deletes text with specified range from the document.
+ * @param  {number} startColumn
+ * @param  {number} startRow
+ * @param  {number} endColumn
+ * @param  {number} endRow
+ */
+Document.prototype.deleteRange = function(startColumn, startRow, endColumn, endRow) {
+
+  // Check bounds
+  startRow >= 0 || (startRow = 0);
+  startColumn >= 0 || (startColumn = 0);
+  endRow < this.storage.length || (endRow = this.storage.length - 1);
+  endColumn <= this.storage[endRow].length || (endColumn = this.storage[endRow].length);
+
+  // Little optimization that does nothing if there's nothing to delete
+  if(startColumn === endColumn && startRow === endRow) {
+    return [startColumn, startRow];
+  }
+
+  // Now we append start of start row to the remainder of endRow
+  this.storage[startRow] = this.storage[startRow].substr(0, startColumn) + 
+                           this.storage[endRow].substr(endColumn);
+
+  // And remove everything inbetween
+  this.storage.splice(startRow + 1, endRow - startRow);
+
+  // Return new position
+  return [startColumn, startRow];
+};
+
+/**
+ * Deletes one char forward or backward
+ * @param  {boolean} forward
+ * @param  {number}  column
+ * @param  {number}  row
+ * @return {Array}   new position
+ */
+Document.prototype.deleteChar = function(forward, startColumn, startRow) {
+  var endRow = startRow,
+      endColumn = startColumn;
+
+  if (forward) {
+    // If there are characters after cursor on this line we simple remove one
+    if (startColumn < this.storage[startRow].trim('\n').length) {
+      ++endColumn;
+    }
+    // if there are rows after this one we append it
+    else if (startRow < this.storage.length - 1) {
+      ++endRow;
+      endColumn = 0;
+    }
+  }
+  // Deleting backwards
+  else {
+    // If there are characters before the cursor on this line we simple remove one
+    if (startColumn > 0) {
+      --startColumn;
+    }
+    // if there are rwos before we append current to previous one
+    else if (startRow > 0) {
+      --startRow;
+      startColumn = this.storage[startRow].length - 1;
+    }
+  }
+
+  return this.deleteRange(startColumn, startRow, endColumn, endRow);
 };}, "FontMetrics": function(exports, require, module) {"use strict";
 
 /**
@@ -516,4 +535,155 @@ FontMetrics.prototype.getWidth = function() {
 FontMetrics.prototype.getBaseline = function() {
   return this._baseline;
 };
+}, "Selection": function(exports, require, module) {/**
+ * Creates new selection for the editor.
+ * @param {Editor} editor.
+ * @constructor
+ */
+Selection = function(editor) {
+  this.editor = editor;
+  this.blinkInterval = 500;
+
+  this.start = {
+    line: 0,
+    character: 0
+  };
+
+  this.end = {
+    line: 0,
+    character: 0
+  };
+
+  this.el = document.createElement('div');
+  this.el.style.position = 'absolute';
+  this.el.style.width = '1px';
+  this.el.style.height = this.editor.getFontMetrics().getHeight() + 'px';
+  this.el.style.backgroundColor = '#000';
+
+  this.editor.getEl().appendChild(this.el);
+  this.setPosition(0, 0);
+};
+
+/**
+ * Responsible for blinking
+ * @return {void}
+ */
+Selection.prototype.blink = function() {
+  if (parseInt(this.el.style.opacity, 10)) {
+    this.el.style.opacity = 0;
+  } else {
+    this.el.style.opacity = 1;
+  }
+};
+
+/**
+ * Moves both start and end to a specified position inside document.
+ * @param {number?} line
+ * @param {number?} character
+ */
+Selection.prototype.setPosition = function(character, line) {
+  // Providing defaults for both line and character parts of position
+  if (typeof line === 'undefined') line = this.end.line
+  if (typeof character === 'undefined') character = this.end.character
+
+  // Checking lower bounds
+  line >= 0 || (line = 0);
+  character >= 0 || (character = 0);
+
+  // Checking upper bounds
+  var lineCount = this.editor.getDocument().getLineCount();
+  line < lineCount || (line = lineCount - 1);
+  var characterCount = this.editor.getDocument().getLine(line).trim('\n').length;
+  character <= characterCount || (character = characterCount);
+
+  // Saving new value
+  this.start.line = this.end.line = line;
+  this.start.character = this.end.character = character;
+
+  // Calculating new position on the screen
+  var metrics = this.editor.getFontMetrics(),
+      offsetX = character * metrics.getWidth(),
+      offsetY = line * metrics.getHeight();
+  this.el.style.left = offsetX + 'px';
+  this.el.style.top = offsetY + 'px';
+
+  // This helps to see moving cursor when it is always in blink on
+  // state on a new position. Try to move cursror in any editor and you
+  // will see this in action.
+  if(this.isVisible()) {
+    this.el.style.opacity = 1;
+    clearInterval(this.interval);
+    this.interval = setInterval(this.blink.bind(this), this.blinkInterval);
+  }
+};
+
+/**
+ * Returns current position of the end of the selection
+ * @return {Array}
+ */
+Selection.prototype.getPosition = function() {
+  return [this.end.character, this.end.line];
+}
+
+/**
+ * Moves up specified amount of lines.
+ * @param  {number} length
+ */
+Selection.prototype.moveUp = function(length) {
+  arguments.length || (length = 1);
+  this.setPosition(this.end.character, this.end.line - length);
+};
+
+/**
+ * Moves down specified amount of lines.
+ * @param  {number} length
+ */
+Selection.prototype.moveDown = function(length) {
+  arguments.length || (length = 1);
+  this.setPosition(this.end.character, this.end.line + length);
+};
+
+/**
+ * Moves up specified amount of lines.
+ * @param  {number} length
+ */
+Selection.prototype.moveLeft = function(length) {
+  arguments.length || (length = 1);
+  this.setPosition(this.end.character - length, this.end.line);
+};
+
+/**
+ * Moves down specified amount of lines.
+ * @param  {number} length
+ */
+Selection.prototype.moveRight = function(length) {
+  arguments.length || (length = 1);
+  this.setPosition(this.end.character + length, this.end.line);
+};
+
+/**
+ * Shows or hides cursor.
+ * @param {void} visible Whether cursor should be visible
+ */
+Selection.prototype.setVisible = function(visible) {
+  clearInterval(this.interval);
+  if(visible) {
+    this.el.style.display = 'block';
+    this.el.style.opacity = 1;
+    this.interval = setInterval(this.blink.bind(this), this.blinkInterval);
+  } else {
+    this.el.style.display = 'none';
+  }
+  this.visible = visible;
+};
+
+/**
+ * Returns visibility of the cursor.
+ * @return {Boolean}
+ */
+Selection.prototype.isVisible = function() {
+  return this.visible;
+};
+
+module.exports = Selection;
 }});
