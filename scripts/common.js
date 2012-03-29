@@ -6,7 +6,7 @@ var project = JSON.parse(fs.readFileSync(__dirname + '/../package.json'));
 
 // Stitch everything together
 var package = stitch.createPackage({
-  paths: [__dirname + '/../lib', __dirname + '/../vendor']
+  paths: [__dirname + '/../lib']
 });
 
 module.exports = {
