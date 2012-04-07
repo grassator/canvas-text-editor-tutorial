@@ -1,4 +1,4 @@
-describe("CanvasTextEditor", function() {
+describe("FontMetrics", function() {
   var FontMetrics = require('FontMetrics');
 
   it("should support getters for family and size", function() {
