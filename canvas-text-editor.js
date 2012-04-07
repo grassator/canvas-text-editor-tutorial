@@ -75,6 +75,12 @@ var CanvasTextEditor = function(doc) {
 module.exports = CanvasTextEditor;
 
 /**
+ * Determines if current browser is Opera
+ * @type {Boolean}
+ */
+CanvasTextEditor.prototype.isOpera = ('opera' in window) && ('version' in window.opera);
+
+/**
  * CSS class that is assigned to the wrapper.
  * @type {String}
  */
@@ -131,7 +137,7 @@ CanvasTextEditor.prototype.selectionChange = function() {
   // if it's not we put together selected text from document
   if (!this._selection.isEmpty()) {
     var ranges = this._selection.lineRanges(),
-        line;
+        line = '';
     for(var key in ranges) {
       selectedText += this._document.getLine(parseInt(key)).slice(
         ranges[key][0], ranges[key][1] === true ? undefined : ranges[key][1]
@@ -139,10 +145,7 @@ CanvasTextEditor.prototype.selectionChange = function() {
     }
   }
 
-  // Put selected text into our proxy
-  this.inputEl.value = selectedText;
-  this.inputEl.selectionStart = 0;
-  this.inputEl.selectionEnd = selectedText.length;
+  this.setInputText(selectedText, true);
 
   // Updating canvas to show selection
   this.render();
@@ -247,8 +250,10 @@ CanvasTextEditor.prototype._createInput = function() {
   this.inputEl.addEventListener('blur', this.blur.bind(this), false);
   this.inputEl.addEventListener('focus', this._inputFocus.bind(this), false);
   this.inputEl.addEventListener('keydown', this.keydown.bind(this), false);
+  this.inputEl.addEventListener('keypress', this.setInputText.bind(this, ''), false);
   this.inputEl.tabIndex = -1; // we don't want input to get focus by tabbing
   this.wrapper.appendChild(this.inputEl);
+  this.setInputText('', true);
 };
 
 /**
@@ -256,8 +261,33 @@ CanvasTextEditor.prototype._createInput = function() {
  * @param  {Event} e
  */
 CanvasTextEditor.prototype.handleInput = function(e) {
-  this.insertTextAtCurrentPosition(e.target.value);
-  e.target.value = '';
+  var value = e.target.value;
+  if (this.isOpera) {
+    // Opera doesn't need a placeholder
+    value = value.substring(0, value.length);
+  } else {
+    // Compensate for placeholder
+    value = value.substring(0, value.length - 1);
+  }
+  this.insertTextAtCurrentPosition(value);
+  this.needsClearing = true;
+};
+
+/**
+ * Makes input contain only placeholder character and places cursor at start
+ */
+CanvasTextEditor.prototype.setInputText = function(text, force) {
+  if(this.needsClearing || force === true) {
+    if (this.isOpera) {
+      this.inputEl.value = text;
+      this.inputEl.select();
+    } else {
+      this.inputEl.value = text + '#';
+      this.inputEl.selectionStart = 0;
+      this.inputEl.selectionEnd = text.length;
+    }
+  }
+  this.needsClearing = false;
 };
 
 /**
