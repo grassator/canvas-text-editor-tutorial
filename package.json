@@ -2,7 +2,7 @@
   "author": "Dmitriy Kubyshkin <dmitriy@kubyshkin.ru>",
   "name": "canvas-text-editor",
   "description": "Simple text editor using html5 canvas",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "node": ">= 0.4.x < 0.7.0"
   },
