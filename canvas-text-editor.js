@@ -1,4 +1,14 @@
-
+/**!
+ * Canvas Text Editor
+ *
+ * Copyright (c) 2012 Dmitriy Kubyshkin (http://kubyshkin.ru)
+ * 
+ * Version: 0.1.0 (04/09/2012)
+ * Requires: Browser with canvas support
+ *
+ * Dual licensed under the MIT license:
+ *   http://www.opensource.org/licenses/mit-license.php
+ */
 (function(/*! Stitch !*/) {
   if (!this.require) {
     var modules = {}, cache = {}, require = function(name, root) {
@@ -58,11 +68,30 @@ var FontMetrics = require('FontMetrics'),
  * Simple plain-text text editor using html5 canvas.
  * @constructor
  */
-var CanvasTextEditor = function(doc) {
+var CanvasTextEditor = function(doc, options) {
   this._document = doc || (new Document);
-  this._metrics = new FontMetrics('"Courier New", Courier, monospace', 14);
+
+  this.options = {
+    textColor: 'WindowText',
+    backgroundColor: 'Window',
+    selectionColor: 'Highlight',
+    focusColor: '#09f',
+    fontFamily: '"Courier New", Courier, monospace',
+    fontSize: 14,
+    padding: 5,
+    width: 640,
+    height: 480
+  };
+
+  if (typeof options === 'object') {
+    for(key in options) {
+      this.options[key] = options[key];
+    }
+  }
+
+  this._metrics = new FontMetrics(this.options.fontFamily, this.options.fontSize);
   this._createWrapper();
-  this._selection = new Selection(this);
+  this._selection = new Selection(this, this.options.textColor);
   this._selection.onchange = this.selectionChange.bind(this);
   this._createCanvas();
   this._createInput();
@@ -73,6 +102,18 @@ var CanvasTextEditor = function(doc) {
 };
 
 module.exports = CanvasTextEditor;
+
+/**
+ * Top offset in lines
+ * @type {Number}
+ */
+CanvasTextEditor.prototype._scrollTop = 0;
+
+/**
+ * Left offset in characters
+ * @type {Number}
+ */
+CanvasTextEditor.prototype._scrollLeft = 0;
 
 /**
  * Determines if current browser is Opera
@@ -128,6 +169,22 @@ CanvasTextEditor.prototype.getSelection = function() {
 };
 
 /**
+ * Returns current top offset
+ * @return {number}
+ */
+CanvasTextEditor.prototype.scrollTop = function() {
+  return this._scrollTop;
+};
+
+/**
+ * Returns current left offset
+ * @return {number}
+ */
+CanvasTextEditor.prototype.scrollLeft = function() {
+  return this._scrollLeft;
+};
+
+/**
  * Handles selection change
  */
 CanvasTextEditor.prototype.selectionChange = function() {
@@ -145,6 +202,7 @@ CanvasTextEditor.prototype.selectionChange = function() {
     }
   }
 
+  this._checkScroll();
   this.setInputText(selectedText, true);
 
   // Updating canvas to show selection
@@ -160,8 +218,8 @@ CanvasTextEditor.prototype._createWrapper = function() {
   this.wrapper.className = this.className;
   this.wrapper.style.display = 'inline-block';
   this.wrapper.style.position = 'relative';
-  this.wrapper.style.backgroundColor = '#eee';
-  this.wrapper.style.border = '5px solid #eee';
+  this.wrapper.style.backgroundColor = this.options.backgroundColor;
+  this.wrapper.style.border = this.options.padding + 'px solid ' + this.options.backgroundColor;
   this.wrapper.style.overflow = 'hidden';
   this.wrapper.tabIndex = 0; // tabindex is necessary to get focus
   this.wrapper.addEventListener('focus', this.focus.bind(this), false);
@@ -175,9 +233,30 @@ CanvasTextEditor.prototype._createCanvas = function() {
   this.canvas = document.createElement('canvas');
   this.canvas.style.display = 'block';
   this.context = this.canvas.getContext('2d');
-  this.resize(640, 480);
+  this.resize(this.options.width, this.options.height);
   this.render();
   this.wrapper.appendChild(this.canvas);
+};
+
+/**
+ * Makes sure that cursor is visible
+ * @return {[type]} [description]
+ */
+CanvasTextEditor.prototype._checkScroll = function() {
+  var maxHeight = Math.ceil(this.canvas.height / this._metrics.getHeight()) - 1,
+      maxWidth = Math.ceil(this.canvas.width / this._metrics.getWidth()) - 1,
+      cursorPosition = this._selection.getPosition();
+  if (cursorPosition[0] > this._scrollLeft + maxWidth ) {
+    this._scrollLeft = cursorPosition[0] - maxWidth;
+  } else if (cursorPosition[0] < this._scrollLeft) {
+    this._scrollLeft = cursorPosition[0];
+  }
+  if (cursorPosition[1] > this._scrollTop + maxHeight) {
+    this._scrollTop = cursorPosition[1] - maxHeight;
+  } else if (cursorPosition[1] < this._scrollTop) {
+    this._scrollTop = cursorPosition[1];
+  }
+  this._selection.updateCursorStyle();
 };
 
 /**
@@ -188,7 +267,7 @@ CanvasTextEditor.prototype.render = function() {
   var baselineOffset = this._metrics.getBaseline(),
       lineHeight = this._metrics.getHeight(),
       characterWidth = this._metrics.getWidth(),
-      maxHeight = Math.ceil(640 / lineHeight),
+      maxHeight = Math.ceil(this.canvas.height / lineHeight),
       lineCount = this._document.getLineCount(),
       selectionRanges = this._selection.lineRanges(),
       selectionWidth = 0;
@@ -197,17 +276,17 @@ CanvasTextEditor.prototype.render = function() {
   if (lineCount < maxHeight) maxHeight = lineCount;
 
   // Clearing previous iteration
-  this.context.fillStyle = '#eee';
+  this.context.fillStyle = this.options.backgroundColor;
   this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  this.context.fillStyle = '#000';
+  this.context.fillStyle = this.options.textColor;
 
   // Looping over document lines
-  for(var i = 0; i < maxHeight; ++i) {
-    var topOffset = lineHeight * i;
+  for(var i = this._scrollTop; i < maxHeight + this._scrollTop; ++i) {
+    var topOffset = lineHeight * (i - this._scrollTop);
 
     // Rendering selection for this line if one is present
     if (selectionRanges[i]) {
-      this.context.fillStyle = '#cce6ff';
+      this.context.fillStyle = this.options.selectionColor;
 
       // Check whether we should select to the end of the line or not
       if(selectionRanges[i][1] === true) {
@@ -218,19 +297,19 @@ CanvasTextEditor.prototype.render = function() {
 
       // Drawing selection
       this.context.fillRect(
-        selectionRanges[i][0] * characterWidth,
-        i * lineHeight,
+        (selectionRanges[i][0] - this._scrollLeft) * characterWidth,
+        topOffset,
         selectionWidth,
         lineHeight
       )
 
       // Restoring fill color for the text
-      this.context.fillStyle = '#000';
+      this.context.fillStyle = this.options.textColor;
     }
 
     // Drawing text
     this.context.fillText(
-      this._document.getLine(i), 0, topOffset + baselineOffset
+      this._document.getLine(i).slice(this._scrollLeft), 0, topOffset + baselineOffset
     );
   }
 };
@@ -341,7 +420,7 @@ CanvasTextEditor.prototype.deleteCharAtCurrentPosition = function(forward) {
  * @private
  */
 CanvasTextEditor.prototype._inputFocus = function() {
-  this.wrapper.style.outline = '1px solid #09f';
+  this.wrapper.style.outline = '1px solid ' + this.options.focusColor;
   this._selection.setVisible(true);
 };
 
@@ -388,10 +467,10 @@ CanvasTextEditor.prototype.resize = function(width, height) {
 CanvasTextEditor.prototype.keydown = function(e) {
   var handled = true;
   switch(e.keyCode) {
-    case 8: // backspace
+    case 8: // Backspace
       this.deleteCharAtCurrentPosition(false);
       break;
-    case 46: // delete
+    case 46: // Delete
       this.deleteCharAtCurrentPosition(true);
       break;
     case 13: // Enter
@@ -403,7 +482,7 @@ CanvasTextEditor.prototype.keydown = function(e) {
     case 38: // Up arrow
       this._selection.moveUp(1, this.shiftPressed);
       break;
-    case 39: // Up arrow
+    case 39: // Right arrow
       this._selection.moveRight(1, this.shiftPressed);
       break;
     case 40: // Down arrow
@@ -697,8 +776,9 @@ FontMetrics.prototype.getBaseline = function() {
  * @param {Editor} editor.
  * @constructor
  */
-Selection = function(editor) {
+Selection = function(editor, color) {
   this.editor = editor;
+  color || (color = '#000');
 
   this.start = {
     line: 0,
@@ -714,7 +794,7 @@ Selection = function(editor) {
   this.el.style.position = 'absolute';
   this.el.style.width = '1px';
   this.el.style.height = this.editor.getFontMetrics().getHeight() + 'px';
-  this.el.style.backgroundColor = '#000';
+  this.el.style.backgroundColor = color;
 
   this.editor.getEl().appendChild(this.el);
   this.setPosition(0, 0);
@@ -805,7 +885,6 @@ Selection.prototype.setPosition = function(character, line, keepSelection) {
 
   // Calling private setter that does the heavy lifting
   this._doSetPosition(position[0], position[1], keepSelection);
-  this._updateCursorStyle();
 
   // Making a callback if necessary
   if (typeof this.onchange === 'function') {
@@ -837,6 +916,7 @@ Selection.prototype._forceBounds = function(character, line) {
   line < lineCount || (line = lineCount - 1);
   var characterCount = this.editor.getDocument().getLine(line).trim('\n').length;
   if (character > characterCount) {
+    // Wraparound for lines
     if (line === position[1] && line < this.editor.getDocument().getLineCount() - 1) {
       ++line;
       character = 0;
@@ -850,12 +930,12 @@ Selection.prototype._forceBounds = function(character, line) {
 /**
  * Updates cursor styles so it matches current position
  */
-Selection.prototype._updateCursorStyle = function() {
+Selection.prototype.updateCursorStyle = function() {
   // Calculating new position on the screen
   var metrics = this.editor.getFontMetrics(),
       position = this.getPosition(),
-      offsetX = position[0] * metrics.getWidth(),
-      offsetY = position[1] * metrics.getHeight();
+      offsetX = (position[0] - this.editor.scrollLeft()) * metrics.getWidth(),
+      offsetY = (position[1] - this.editor.scrollTop()) * metrics.getHeight();
   this.el.style.left = offsetX + 'px';
   this.el.style.top = offsetY + 'px';
 
@@ -876,7 +956,7 @@ Selection.prototype._updateCursorStyle = function() {
  * @param  {boolean} keepSelection
  */
 Selection.prototype._doSetPosition = function(character, line, keepSelection) {
-  // Saving new value
+  // If this is a selection range
   if (keepSelection) {
 
     compare = this.comparePosition({
@@ -884,11 +964,14 @@ Selection.prototype._doSetPosition = function(character, line, keepSelection) {
       character: character
     }, this.start);
 
-    // If selection is empty and we are moving left we set active side to start
+    // Determining whether we should make the start side of the range active
+    // (have a cursor). This happens when we start the selection be moving
+    // left, or moving up.
     if (compare === -1 && (this.isEmpty() || line < this.start.line)) {
       this.activeEndSide = false;
     } 
 
+    // Assign new value to the side that is active
     if (this.activeEndSide) {
       this.end.line = line;
       this.end.character = character;
@@ -897,7 +980,7 @@ Selection.prototype._doSetPosition = function(character, line, keepSelection) {
       this.start.character = character;
     }
 
-    // Making sure that end is further than start
+    // Making sure that end is further than start and swap if necessary
     if (this.comparePosition(this.start, this.end) > 0) {
       this.activeEndSide = !this.activeEndSide;
       var temp = {
@@ -909,7 +992,7 @@ Selection.prototype._doSetPosition = function(character, line, keepSelection) {
       this.end.line = temp.line;
       this.end.character = temp.character;
     }
-  } else {
+  } else { // Simple cursor move
     this.activeEndSide = true;
     this.start.line = this.end.line = line;
     this.start.character = this.end.character = character;
