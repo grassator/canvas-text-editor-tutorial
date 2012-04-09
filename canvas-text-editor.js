@@ -1,14 +1,4 @@
-/**!
- * Canvas Text Editor
- *
- * Copyright (c) 2012 Dmitriy Kubyshkin (http://kubyshkin.ru)
- * 
- * Version: 0.1.0 (04/09/2012)
- * Requires: Browser with canvas support
- *
- * Dual licensed under the MIT license:
- *   http://www.opensource.org/licenses/mit-license.php
- */
+
 (function(/*! Stitch !*/) {
   if (!this.require) {
     var modules = {}, cache = {}, require = function(name, root) {
@@ -267,12 +257,12 @@ CanvasTextEditor.prototype.render = function() {
   var baselineOffset = this._metrics.getBaseline(),
       lineHeight = this._metrics.getHeight(),
       characterWidth = this._metrics.getWidth(),
-      maxHeight = Math.ceil(this.canvas.height / lineHeight),
+      maxHeight = Math.ceil(this.canvas.height / lineHeight) + this._scrollTop,
       lineCount = this._document.getLineCount(),
       selectionRanges = this._selection.lineRanges(),
       selectionWidth = 0;
 
-  // Making sure we don't render somethign that we won't see
+  // Making sure we don't render something that we won't see
   if (lineCount < maxHeight) maxHeight = lineCount;
 
   // Clearing previous iteration
@@ -281,7 +271,7 @@ CanvasTextEditor.prototype.render = function() {
   this.context.fillStyle = this.options.textColor;
 
   // Looping over document lines
-  for(var i = this._scrollTop; i < maxHeight + this._scrollTop; ++i) {
+  for(var i = this._scrollTop; i < maxHeight; ++i) {
     var topOffset = lineHeight * (i - this._scrollTop);
 
     // Rendering selection for this line if one is present
