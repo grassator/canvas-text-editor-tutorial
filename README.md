@@ -331,7 +331,7 @@ return !handled;
 };
 ```
 
-That’s it — it’s now possible to move cursor inside text editor. I’ve created a live [demo page](https://grassator.github.com/canvas-text-editor/) that will showcase current state of the project from now on.
+That’s it — it’s now possible to move cursor inside text editor. I’ve created a live [demo page](https://grassator.github.com/canvas-text-editor-tutorial/) that will showcase current state of the project from now on.
 
 Source code for this part is available on [github](https://github.com/grassator/canvas-text-editor) under `part-5` tag.
 
@@ -510,7 +510,7 @@ That’s all – deletion should be working now.
 
 ### Summary
 
-We now have ability insert (and paste from clipboard) and delete text. There’s a live [demo page](https://grassator.github.com/canvas-text-editor/) that you can play with.
+We now have ability insert (and paste from clipboard) and delete text. There’s a live [demo page](https://grassator.github.com/canvas-text-editor-tutorial/) that you can play with.
 
 Source code for this part is available on [github](https://github.com/grassator/canvas-text-editor) under `part-6` tag.
 
@@ -724,7 +724,7 @@ The implementation details of `setInputText` aren’t really important because i
 
 ### Summary
 
-If you want to see the latest version of the editor in action – visit a live [demo page](https://grassator.github.com/canvas-text-editor/).
+If you want to see the latest version of the editor in action – visit a live [demo page](https://grassator.github.com/canvas-text-editor-tutorial/).
 
 Please note that code for this part also contains a lot of fixes for compatibility issues in Opera and Firefox that made text editor previously unusable there.
 
