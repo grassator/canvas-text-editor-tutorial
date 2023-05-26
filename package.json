@@ -6,10 +6,15 @@
   "engines": {
     "node": ">= 0.4.x < 0.7.0"
   },
+  "scripts": {
+    "dev": "vite"
+  },
   "devDependencies": {
     "coffee-script": "latest",
+    "express": "latest",
     "stitch": "latest",
     "uglify-js": "latest",
-    "express": "latest"
+    "vite": "^4.3.8",
+    "vite-plugin-commonjs": "^0.7.1"
   }
 }
