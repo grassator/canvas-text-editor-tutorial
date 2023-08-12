@@ -1,6 +1,6 @@
 describe("Selection", function() {
-  var CanvasTextEditor = require('CanvasTextEditor'),
-      Document = require('Document'),
+  var CanvasTextEditor = require('../lib/CanvasTextEditor'),
+      Document = require('../lib/Document'),
       testText = 'Line1\nLine2\nLine3',
       selection;
 

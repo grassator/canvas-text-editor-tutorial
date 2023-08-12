@@ -1,5 +1,5 @@
 describe("Document", function() {
-  var Document = require('Document'),
+  var Document = require('../lib/Document'),
       testText = 'Line1\n\nLine3\nLine4',
       doc = null;
 
