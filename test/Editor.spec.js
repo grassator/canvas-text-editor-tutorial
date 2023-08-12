@@ -1,5 +1,5 @@
 describe("CanvasTextEditor", function() {
-  var CanvasTextEditor = require('CanvasTextEditor'),
+  var CanvasTextEditor = require('../lib/CanvasTextEditor'),
       editor;
 
   beforeEach(function(){

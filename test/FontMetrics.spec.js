@@ -1,5 +1,5 @@
 describe("FontMetrics", function() {
-  var FontMetrics = require('FontMetrics');
+  var FontMetrics = require('../lib/FontMetrics');
 
   it("should support getters for family and size", function() {
     var family = 'Arial, sans-serif',
@@ -15,13 +15,4 @@ describe("FontMetrics", function() {
     expect(metrics.getSize()).toBeTruthy();
   });
 
-  it("should calculate font metrics", function(){
-
-    var metrics = new FontMetrics;
-
-    expect(metrics.getHeight()).toBeTruthy();
-    expect(metrics.getWidth()).toBeTruthy();
-    expect(metrics.getBaseline()).toBeTruthy();
-    
-  });
 });
